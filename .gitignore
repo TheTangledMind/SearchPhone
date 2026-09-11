@@ -35,3 +35,8 @@ __pycache__/
 Thumbs.db
 .env
 .env.local
+
+# Local credentials and environment
+.env.*
+!.env.example
+.venv/

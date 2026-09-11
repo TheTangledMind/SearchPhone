@@ -13,6 +13,7 @@ import phonenumbers
 from phonenumbers import carrier, geocoder, timezone
 import concurrent.futures
 from urllib.parse import quote_plus
+from i18n import Translator, available_languages
 
 # Intentar importar fpdf para PDF
 try:
@@ -20,8 +21,6 @@ try:
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
-    print(f"{Fore.YELLOW}⚠️ fpdf2 no instalado. Los PDFs no se generarán.")
-    print(f"{Fore.WHITE}   Instalar con: pip install fpdf2")
 
 # Load environment variables
 load_dotenv()
@@ -49,7 +48,8 @@ jgs  |[:::]|                '-----'
 """
 
 class PhoneOSINT:
-    def __init__(self):
+    def __init__(self, language=None):
+        self.tr = Translator(language)
         # SOLO LAS QUE FUNCIONAN
         self.api_keys = {
             'numverify': os.getenv('NUMVERIFY_KEY', ''),
@@ -83,8 +83,8 @@ class PhoneOSINT:
                 'international': phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.INTERNATIONAL),
                 'national': phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.NATIONAL),
                 'e164': phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164),
-                'country': geocoder.description_for_number(phone, 'en'),
-                'carrier': carrier.name_for_number(phone, 'en'),
+                'country': geocoder.description_for_number(phone, self.tr.language),
+                'carrier': carrier.name_for_number(phone, self.tr.language),
                 'timezone': timezone.time_zones_for_number(phone)
             }
             return info
@@ -114,7 +114,7 @@ class PhoneOSINT:
                         'line_type': data.get('line_type')
                     }
         except Exception as e:
-            print(f"{Fore.RED}❌ Numverify: Error - {e}")
+            print(self.tr('console.numverify_error', v0=Fore.RED, v1=e))
         return None
     
     def check_hudsonrock(self, phone_number):
@@ -147,16 +147,16 @@ class PhoneOSINT:
                 else:
                     return {
                         'found': False,
-                        'message': 'No se encontraron registros en infostealer'
+                        'message': self.tr('no_infostealer_records')
                     }
             elif response.status_code == 404:
-                return {'found': False, 'message': 'Número no encontrado en la base de datos'}
+                return {'found': False, 'message': self.tr('number_not_found')}
             else:
-                print(f"{Fore.YELLOW}⚠️ Hudson Rock: Error {response.status_code}")
+                print(self.tr('console.hudson_rock_error_2', v0=Fore.YELLOW, v1=response.status_code))
                 return None
                 
         except Exception as e:
-            print(f"{Fore.RED}❌ Hudson Rock: Error - {e}")
+            print(self.tr('console.hudson_rock_error', v0=Fore.RED, v1=e))
             return None
     
     def search_google(self, phone_number):
@@ -222,7 +222,7 @@ class PhoneOSINT:
                         })
                 return results
         except Exception as e:
-            print(f"{Fore.RED}❌ Google: Error - {e}")
+            print(self.tr('console.google_error', v0=Fore.RED, v1=e))
         return []
     
     def search_duckduckgo(self, phone_number):
@@ -243,7 +243,7 @@ class PhoneOSINT:
                     })
                 return results
         except Exception as e:
-            print(f"{Fore.RED}❌ DuckDuckGo: Error - {e}")
+            print(self.tr('console.duckduckgo_error', v0=Fore.RED, v1=e))
         return []
     
     def search_reddit(self, phone_number):
@@ -261,7 +261,7 @@ class PhoneOSINT:
                 for item in data.get('data', {}).get('children', []):
                     post = item.get('data', {})
                     results.append({
-                        'title': post.get('title', 'Sin título'),
+                        'title': post.get('title', self.tr('untitled')),
                         'subreddit': post.get('subreddit', ''),
                         'url': f"https://reddit.com{post.get('permalink', '')}",
                         'score': post.get('score', 0),
@@ -269,7 +269,7 @@ class PhoneOSINT:
                     })
                 return results
         except Exception as e:
-            print(f"{Fore.RED}❌ Reddit: Error - {e}")
+            print(self.tr('console.reddit_error', v0=Fore.RED, v1=e))
         return []
     
     def search_github(self, phone_number):
@@ -293,14 +293,14 @@ class PhoneOSINT:
                 for item in data.get('items', [])[:10]:
                     repo = item.get('repository', {})
                     results.append({
-                        'repository': repo.get('full_name', 'Desconocido'),
+                        'repository': repo.get('full_name', self.tr('unknown')),
                         'path': item.get('path', ''),
                         'url': item.get('html_url', ''),
                         'language': repo.get('language', ''),
                     })
                 return results
         except Exception as e:
-            print(f"{Fore.RED}❌ GitHub: Error - {e}")
+            print(self.tr('console.github_error', v0=Fore.RED, v1=e))
         return []
     
     def analyze_phone(self, number, region='pe'):
@@ -310,23 +310,23 @@ class PhoneOSINT:
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         print(f"\n{Fore.CYAN}{'='*60}")
-        print(f"{Fore.GREEN}📱 ANALIZANDO NÚMERO: {number}")
+        print(self.tr('console.analyzing_number', v0=Fore.GREEN, v1=number))
         print(f"{Fore.CYAN}{'='*60}\n")
         
         # Intentar validar el número (no bloqueante)
         phone_info = self.validate_phone(number, region)
         if phone_info:
             self.results['phone_info'] = phone_info
-            print(f"{Fore.GREEN}✅ Información básica:")
-            print(f"{Fore.YELLOW}  📞 Internacional: {Fore.WHITE}{phone_info['international']}")
-            print(f"{Fore.YELLOW}  🌍 País: {Fore.WHITE}{phone_info['country']}")
-            print(f"{Fore.YELLOW}  📡 Operador: {Fore.WHITE}{phone_info['carrier']}")
-            print(f"{Fore.YELLOW}  🕐 Zona Horaria: {Fore.WHITE}{', '.join(phone_info['timezone'])}")
+            print(self.tr('console.basic_information', v0=Fore.GREEN))
+            print(self.tr('console.international', v0=Fore.YELLOW, v1=Fore.WHITE, v2=phone_info['international']))
+            print(self.tr('console.country', v0=Fore.YELLOW, v1=Fore.WHITE, v2=phone_info['country']))
+            print(self.tr('console.carrier', v0=Fore.YELLOW, v1=Fore.WHITE, v2=phone_info['carrier']))
+            print(self.tr('console.time_zone', v0=Fore.YELLOW, v1=Fore.WHITE, v2=', '.join(phone_info['timezone'])))
         else:
-            print(f"{Fore.YELLOW}⚠️ Número no válido según estándares internacionales. Se continuará con la búsqueda en Hudson Rock y otras fuentes.")
+            print(self.tr('console.number_is_not_valid_under_international_standards_continuing_with', v0=Fore.YELLOW))
         
         # Parallel API calls - SOLO LAS QUE FUNCIONAN
-        print(f"\n{Fore.GREEN}🔍 Verificando en APIs...")
+        print(self.tr('console.checking_apis', v0=Fore.GREEN))
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
             futures = {
@@ -346,28 +346,28 @@ class PhoneOSINT:
                     if source == 'numverify':
                         if result:
                             self.results['numverify'] = result
-                            print(f"{Fore.GREEN}✅ Numverify: OK")
+                            print(self.tr('console.numverify_ok', v0=Fore.GREEN))
                         else:
-                            print(f"{Fore.YELLOW}⚠️ Numverify: Sin datos")
+                            print(self.tr('console.numverify_no_data', v0=Fore.YELLOW))
 
                     elif source == 'hudsonrock':  # <-- NUEVO
                         if result and result.get('found'):
                             self.results['hudsonrock'] = result
-                            print(f"{Fore.GREEN}✅ Hudson Rock: {len(result.get('stealers', []))} infecciones encontradas")
+                            print(self.tr('console.hudson_rock_infections_found_2', v0=Fore.GREEN, v1=len(result.get('stealers', []))))
                         elif result:
-                            print(f"{Fore.YELLOW}⚠️ Hudson Rock: Sin registros")
+                            print(self.tr('console.hudson_rock_no_records', v0=Fore.YELLOW))
                         else:
-                            print(f"{Fore.YELLOW}⚠️ Hudson Rock: Sin datos")
+                            print(self.tr('console.hudson_rock_no_data', v0=Fore.YELLOW))
                             
                     else:
                         if result and len(result) > 0:
                             self.results[source] = result
-                            print(f"{Fore.GREEN}✅ {source.capitalize()}: {len(result)} resultados")
+                            print(self.tr('console.results_2', v0=Fore.GREEN, v1=source.capitalize(), v2=len(result)))
                         else:
-                            print(f"{Fore.YELLOW}⚠️ {source.capitalize()}: 0 resultados")
+                            print(self.tr('console.0_results', v0=Fore.YELLOW, v1=source.capitalize()))
                             
                 except Exception as e:
-                    print(f"{Fore.RED}❌ {source.capitalize()}: Error - {str(e)[:60]}")
+                    print(self.tr('console.error', v0=Fore.RED, v1=source.capitalize(), v2=str(e)[:60]))
         
         self.display_results()
         self.export_results()
@@ -376,44 +376,44 @@ class PhoneOSINT:
     def display_results(self):
         """Display all collected results"""
         print(f"\n{Fore.CYAN}{'='*60}")
-        print(f"{Fore.GREEN}📊 REPORTE COMPLETO")
+        print(self.tr('console.full_report', v0=Fore.GREEN))
         print(f"{Fore.CYAN}{'='*60}\n")
         
         # Numverify
         if self.results.get('numverify'):
-            print(f"{Fore.YELLOW}📱 Numverify:")
+            print(self.tr('console.numverify', v0=Fore.YELLOW))
             nv = self.results['numverify']
             if nv.get('carrier'):
-                print(f"{Fore.WHITE}  Operador: {nv['carrier']}")
+                print(self.tr('console.carrier_2', v0=Fore.WHITE, v1=nv['carrier']))
             if nv.get('line_type'):
-                print(f"{Fore.WHITE}  Tipo: {nv['line_type']}")
+                print(self.tr('console.type', v0=Fore.WHITE, v1=nv['line_type']))
             if nv.get('country'):
-                print(f"{Fore.WHITE}  País: {nv['country']}")
+                print(self.tr('console.country_2', v0=Fore.WHITE, v1=nv['country']))
             print()
 
         # Hudson Rock
         if self.results.get('hudsonrock') and self.results['hudsonrock'].get('found'):
-            print(f"{Fore.YELLOW}🛡️ HUDSON ROCK (Infostealer Intelligence):")
+            print(self.tr('console.hudson_rock_infostealer_intelligence', v0=Fore.YELLOW))
             hr = self.results['hudsonrock']
-            print(f"{Fore.WHITE}  Estado: {Fore.RED}⚠️ COMPROMETIDO")
-            print(f"{Fore.WHITE}  Servicios corporativos: {hr.get('total_corporate_services', 0)}")
-            print(f"{Fore.WHITE}  Servicios personales: {hr.get('total_user_services', 0)}")
+            print(self.tr('console.status_compromised', v0=Fore.WHITE, v1=Fore.RED))
+            print(self.tr('console.corporate_services', v0=Fore.WHITE, v1=hr.get('total_corporate_services', 0)))
+            print(self.tr('console.personal_services', v0=Fore.WHITE, v1=hr.get('total_user_services', 0)))
             
             for i, stealer in enumerate(hr.get('stealers', [])[:3], 1):
-                print(f"{Fore.WHITE}  [{i}] Stealer: {stealer.get('stealer_family', 'Desconocido')}")
-                print(f"      Fecha: {stealer.get('date_compromised', '')[:10]}")
-                print(f"      Equipo: {stealer.get('computer_name', 'Desconocido')}")
-                print(f"      SO: {stealer.get('operating_system', 'Desconocido')}")
+                print(self.tr('console.stealer', v0=Fore.WHITE, v1=i, v2=stealer.get('stealer_family', self.tr('unknown'))))
+                print(self.tr('console.date', v0=stealer.get('date_compromised', '')[:10]))
+                print(self.tr('console.computer', v0=stealer.get('computer_name', self.tr('unknown'))))
+                print(self.tr('console.os', v0=stealer.get('operating_system', self.tr('unknown'))))
                 if stealer.get('top_logins'):
                     logins = ', '.join(stealer['top_logins'][:3])
-                    print(f"      Logins filtrados: {logins}")
+                    print(self.tr('console.leaked_logins', v0=logins))
             print()
         
         # Google
         if self.results.get('google'):
-            print(f"{Fore.YELLOW}🔎 GOOGLE:")
+            print(self.tr('console.google', v0=Fore.YELLOW))
             for i, item in enumerate(self.results['google'][:5], 1):
-                print(f"{Fore.WHITE}  {i}. {item.get('title', 'Sin título')[:100]}")
+                print(f"{Fore.WHITE}  {i}. {item.get('title', self.tr('untitled'))[:100]}")
                 if item.get('link'):
                     print(f"     {Fore.BLUE}🔗 {item['link'][:100]}")
                 if item.get('snippet'):
@@ -422,20 +422,20 @@ class PhoneOSINT:
         
         # Reddit
         if self.results.get('reddit') and len(self.results['reddit']) > 0:
-            print(f"{Fore.YELLOW}📝 REDDIT:")
+            print(self.tr('console.reddit', v0=Fore.YELLOW))
             for i, post in enumerate(self.results['reddit'][:3], 1):
-                print(f"{Fore.WHITE}  {i}. {post.get('title', 'Sin título')[:80]}")
+                print(f"{Fore.WHITE}  {i}. {post.get('title', self.tr('untitled'))[:80]}")
                 if post.get('url'):
                     print(f"     {Fore.BLUE}🔗 {post['url']}")
                 if post.get('subreddit'):
-                    print(f"     📊 r/{post['subreddit']} - Score: {post.get('score', 0)}")
+                    print(self.tr('console.r_score', v0=post['subreddit'], v1=post.get('score', 0)))
             print()
         
         # GitHub
         if self.results.get('github') and len(self.results['github']) > 0:
-            print(f"{Fore.YELLOW}💻 GITHUB:")
+            print(self.tr('console.github', v0=Fore.YELLOW))
             for i, item in enumerate(self.results['github'][:3], 1):
-                repo = item.get('repository', 'Desconocido')
+                repo = item.get('repository', self.tr('unknown'))
                 path = item.get('path', '')
                 url = item.get('url', '')
                 language = item.get('language', '')
@@ -448,12 +448,12 @@ class PhoneOSINT:
                 if url:
                     print(f"     {Fore.BLUE}🔗 {url}")
                 if language:
-                    print(f"     💻 Lenguaje: {language}")
+                    print(self.tr('console.language', v0=language))
             print()
         
         # Summary
         print(f"{Fore.CYAN}{'='*60}")
-        print(f"{Fore.GREEN}📊 RESUMEN:")
+        print(self.tr('console.summary', v0=Fore.GREEN))
         
         total_found = 0
 # Primero, resultados de búsquedas
@@ -466,29 +466,29 @@ class PhoneOSINT:
 
         for name, count in services:
             if count > 0:
-                print(f"{Fore.WHITE}  {name}: {count} resultados")
+                print(self.tr('console.results', v0=Fore.WHITE, v1=name, v2=count))
                 total_found += count
 
         # Luego, Hudson Rock (si tiene datos)
         if self.results.get('hudsonrock') and self.results['hudsonrock'].get('found'):
             hr = self.results['hudsonrock']
             infect_count = len(hr.get('stealers', []))
-            print(f"{Fore.WHITE}  Hudson Rock: {infect_count} infecciones encontradas")
+            print(self.tr('console.hudson_rock_infections_found', v0=Fore.WHITE, v1=infect_count))
             total_found += infect_count
         
         if total_found == 0:
-            print(f"{Fore.YELLOW}  No se encontraron resultados en ninguna fuente")
+            print(self.tr('console.no_results_found_in_any_source', v0=Fore.YELLOW))
         
-        print(f"{Fore.YELLOW}\n  Total de resultados: {total_found}")
+        print(self.tr('console.total_results', v0=Fore.YELLOW, v1=total_found))
         print(f"{Fore.CYAN}{'='*60}\n")
         
         self.show_export_info()
     
     def show_export_info(self):
         """Mostrar información de los archivos exportados"""
-        print(f"{Fore.GREEN}📄 Reportes guardados en: {self.report_dir}/")
-        print(f"{Fore.WHITE}  JSON: {self.get_filename('json')}")
-        print(f"{Fore.WHITE}  PDF:  {self.get_filename('pdf')}")
+        print(self.tr('console.reports_saved_in', v0=Fore.GREEN, v1=self.report_dir))
+        print(self.tr('console.json', v0=Fore.WHITE, v1=self.get_filename('json')))
+        print(self.tr('console.pdf', v0=Fore.WHITE, v1=self.get_filename('pdf')))
         print(f"{Fore.CYAN}{'='*60}\n")
     
     def get_filename(self, extension):
@@ -513,7 +513,7 @@ class PhoneOSINT:
         }
         for old, new in replacements.items():
             text = text.replace(old, new)
-        text = text.encode('ascii', 'ignore').decode('ascii')
+        text = text.encode('latin-1', 'ignore').decode('latin-1')
         return text
     
     def export_results(self):
@@ -525,7 +525,8 @@ class PhoneOSINT:
                 'phone': self.phone_number,
                 'region': self.region,
                 'timestamp': datetime.now().isoformat(),
-                'tool': 'SearchPhone OSINT'
+                'tool': 'SearchPhone OSINT',
+                'language': self.tr.language
             },
             'results': self.results
         }
@@ -533,14 +534,14 @@ class PhoneOSINT:
         try:
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(export_data, f, indent=2, ensure_ascii=False)
-            print(f"{Fore.GREEN}✅ JSON exportado: {filename}")
+            print(self.tr('console.json_exported', v0=Fore.GREEN, v1=filename))
         except Exception as e:
-            print(f"{Fore.RED}❌ Error exportando JSON: {e}")
+            print(self.tr('console.error_exporting_json', v0=Fore.RED, v1=e))
     
     def export_pdf(self):
         """Exportar resultados a PDF"""
         if not PDF_AVAILABLE:
-            print(f"{Fore.YELLOW}⚠️ PDF no generado (fpdf no instalado)")
+            print(self.tr('console.pdf_not_generated_fpdf_is_not_installed', v0=Fore.YELLOW))
             return
 
         try:
@@ -553,11 +554,11 @@ class PhoneOSINT:
 
             # Configurar fuente (usar helvetica en lugar de arial, que es la predeterminada)
             pdf.set_font("Helvetica", "B", 16)
-            pdf.cell(190, 10, "SearchPhone OSINT - Reporte", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+            pdf.cell(190, 10, self.tr('report.searchphone_osint_report'), new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
             pdf.set_font("Helvetica", "", 10)
-            pdf.cell(190, 6, f"Telefono: {self.phone_number}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.cell(190, 6, f"Region: {self.region.upper()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.cell(190, 6, f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(190, 6, self.tr('report.phone', v0=self.phone_number), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(190, 6, self.tr('report.region', v0=self.region.upper()), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(190, 6, self.tr('report.date', v0=datetime.now().strftime('%Y-%m-%d %H:%M:%S')), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(5)
 
             pdf.set_draw_color(0, 0, 0)
@@ -566,63 +567,63 @@ class PhoneOSINT:
 
             # Información básica
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(190, 8, "INFORMACION BASICA", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(190, 8, self.tr('report.basic_information'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.set_font("Helvetica", "", 10)
 
             phone_info = self.results.get('phone_info', {})
             if phone_info:
-                pdf.cell(190, 6, f"  Internacional: {self.clean_text(phone_info.get('international', 'N/A'))}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                pdf.cell(190, 6, f"  Pais: {self.clean_text(phone_info.get('country', 'N/A'))}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                pdf.cell(190, 6, f"  Operador: {self.clean_text(phone_info.get('carrier', 'N/A'))}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                pdf.cell(190, 6, f"  Zona Horaria: {self.clean_text(', '.join(phone_info.get('timezone', ['N/A'])))}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.international', v0=self.clean_text(phone_info.get('international', 'N/A'))), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.country', v0=self.clean_text(phone_info.get('country', 'N/A'))), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.carrier', v0=self.clean_text(phone_info.get('carrier', 'N/A'))), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.time_zone', v0=self.clean_text(', '.join(phone_info.get('timezone', ['N/A'])))), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             pdf.ln(5)
 
             # Numverify
             if self.results.get('numverify'):
                 pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(190, 8, "NUMVERIFY", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 8, self.tr('report.numverify'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
                 nv = self.results['numverify']
                 if nv.get('carrier'):
-                    pdf.cell(190, 6, f"  Operador: {self.clean_text(nv['carrier'])}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(190, 6, self.tr('report.carrier', v0=self.clean_text(nv['carrier'])), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 if nv.get('line_type'):
-                    pdf.cell(190, 6, f"  Tipo: {self.clean_text(nv['line_type'])}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(190, 6, self.tr('report.type', v0=self.clean_text(nv['line_type'])), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.ln(5)
 
             # Hudson Rock
             if self.results.get('hudsonrock') and self.results['hudsonrock'].get('found'):
                 pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(190, 8, "HUDSON ROCK (Infostealer Intelligence)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 8, self.tr('report.hudson_rock_infostealer_intelligence'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
                 hr = self.results['hudsonrock']
-                pdf.cell(190, 6, f"  Estado: COMPROMETIDO", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                pdf.cell(190, 6, f"  Servicios corporativos: {hr.get('total_corporate_services', 0)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                pdf.cell(190, 6, f"  Servicios personales: {hr.get('total_user_services', 0)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.status_compromised'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.corporate_services', v0=hr.get('total_corporate_services', 0)), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.personal_services', v0=hr.get('total_user_services', 0)), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 
                 for i, stealer in enumerate(hr.get('stealers', [])[:3], 1):
-                    pdf.cell(190, 6, f"  [{i}] Stealer: {self.clean_text(stealer.get('stealer_family', 'Desconocido'))}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                    pdf.cell(190, 6, f"      Fecha: {stealer.get('date_compromised', '')[:10]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                    pdf.cell(190, 6, f"      Equipo: {self.clean_text(stealer.get('computer_name', 'Desconocido'))}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(190, 6, self.tr('report.stealer', v0=i, v1=self.clean_text(stealer.get('stealer_family', self.tr('unknown')))), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(190, 6, self.tr('report.date_2', v0=stealer.get('date_compromised', '')[:10]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(190, 6, self.tr('report.computer', v0=self.clean_text(stealer.get('computer_name', self.tr('unknown')))), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                     if stealer.get('top_logins'):
                         logins = ', '.join(stealer['top_logins'][:3])
-                        pdf.cell(190, 6, f"      Logins filtrados: {self.clean_text(logins)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.cell(190, 6, self.tr('report.leaked_logins', v0=self.clean_text(logins)), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.ln(5)
 
             # Google
             if self.results.get('google'):
                 pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(190, 8, "GOOGLE", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 8, self.tr('report.google'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
                 for i, item in enumerate(self.results['google'][:5], 1):
-                    title = self.clean_text(item.get('title', 'Sin titulo'))[:100]
+                    title = self.clean_text(item.get('title', self.tr('untitled')))[:100]
                     link = self.clean_text(item.get('link', ''))
                     snippet = self.clean_text(item.get('snippet', ''))[:200]
 
                     pdf.cell(190, 6, f"  {i}. {title}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                     if link:
                         pdf.set_font("Helvetica", "I", 8)
-                        pdf.cell(190, 5, f"     URL: {link[:80]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.cell(190, 5, self.tr('report.url', v0=link[:80]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                         pdf.set_font("Helvetica", "", 10)
                     if snippet:
                         pdf.set_font("Helvetica", "I", 9)
@@ -634,26 +635,26 @@ class PhoneOSINT:
             # Reddit (opcional, ya que a veces da 0 resultados)
             if self.results.get('reddit') and len(self.results['reddit']) > 0:
                 pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(190, 8, "REDDIT", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 8, self.tr('report.reddit'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
                 for i, post in enumerate(self.results['reddit'][:3], 1):
-                    title = self.clean_text(post.get('title', 'Sin titulo'))[:80]
+                    title = self.clean_text(post.get('title', self.tr('untitled')))[:80]
                     url = self.clean_text(post.get('url', ''))
 
                     pdf.cell(190, 6, f"  {i}. {title}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                     if url:
                         pdf.set_font("Helvetica", "I", 8)
-                        pdf.cell(190, 5, f"     URL: {url}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.cell(190, 5, self.tr('report.url', v0=url), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                         pdf.set_font("Helvetica", "", 10)
                 pdf.ln(3)
 
             # GitHub
             if self.results.get('github') and len(self.results['github']) > 0:
                 pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(190, 8, "GITHUB", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 8, self.tr('report.github'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
                 for i, item in enumerate(self.results['github'][:3], 1):
-                    repo = self.clean_text(item.get('repository', 'Desconocido'))
+                    repo = self.clean_text(item.get('repository', self.tr('unknown')))
                     path = self.clean_text(item.get('path', ''))
                     url = self.clean_text(item.get('url', ''))
 
@@ -663,13 +664,13 @@ class PhoneOSINT:
                     pdf.cell(190, 6, f"  {i}. {display[:100]}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                     if url:
                         pdf.set_font("Helvetica", "I", 8)
-                        pdf.cell(190, 5, f"     URL: {url}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                        pdf.cell(190, 5, self.tr('report.url', v0=url), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                         pdf.set_font("Helvetica", "", 10)
                 pdf.ln(3)
 
             # Resumen
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(190, 8, "RESUMEN", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(190, 8, self.tr('report.summary'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.set_font("Helvetica", "", 10)
 
             total_found = 0
@@ -677,41 +678,74 @@ class PhoneOSINT:
             for source in services:
                 count = len(self.results.get(source, []))
                 if count > 0:
-                    pdf.cell(190, 6, f"  {source.capitalize()}: {count} resultados", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.cell(190, 6, self.tr('report.results', v0=source.capitalize(), v1=count), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                     total_found += count
 
             # Añadir Hudson Rock al resumen del PDF
             if self.results.get('hudsonrock') and self.results['hudsonrock'].get('found'):
                 hr = self.results['hudsonrock']
                 infect_count = len(hr.get('stealers', []))
-                pdf.cell(190, 6, f"  Hudson Rock: {infect_count} infecciones encontradas", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.cell(190, 6, self.tr('report.hudson_rock_infections_found', v0=infect_count), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 total_found += infect_count
 
-            pdf.cell(190, 6, f"\n  TOTAL DE RESULTADOS: {total_found}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(190, 6, self.tr('report.total_results', v0=total_found), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             pdf.output(filename)
-            print(f"{Fore.GREEN}✅ PDF exportado: {filename}")
+            print(self.tr('console.pdf_exported', v0=Fore.GREEN, v1=filename))
 
         except Exception as e:
-            print(f"{Fore.RED}❌ Error exportando PDF: {e}")
+            print(self.tr('console.error_exporting_pdf', v0=Fore.RED, v1=e))
+
+def choose_language(tr):
+    print(tr('language.title'))
+    languages = available_languages()
+    for number, (_, name) in enumerate(languages, 1):
+        print(tr('language.option', number=number, name=name))
+    print(tr('language.cancel'))
+    choice = input(tr('menu.choice')).strip()
+    if choice == '0':
+        return
+    if choice not in {str(i) for i in range(1, len(languages) + 1)}:
+        print(tr('menu.invalid'))
+        return
+    code, name = languages[int(choice) - 1]
+    try:
+        tr.set_language(code, persist=True)
+    except OSError:
+        print(tr('language.save_failed'))
+        return
+    print(tr('language.saved', language=name))
+
 
 def main():
-    # Imprimir ASCII art en verde
+    tr = Translator()
     print(Fore.GREEN + ascii_art)
-    
-    # Línea de donations con estilo llamativo
-    print(f"{Fore.YELLOW}{Style.BRIGHT}☕ Donations: https://buymeacoffee.com/hackunderway{Style.RESET_ALL}")
-    print()  # Línea en blanco para separar
-    
-    # Get input
-    phone_number = input(Fore.GREEN + "📱 Introduce el número de teléfono: ")
-    region = input(Fore.GREEN + "🌍 Introduce la región (ej. 'pe' para Perú): ")
-    
-    # Create analyzer instance
-    analyzer = PhoneOSINT()
-    
-    # Analyze
-    analyzer.analyze_phone(phone_number, region)
+    if not PDF_AVAILABLE:
+        print(Fore.YELLOW + tr('pdf.missing'))
+        print(tr('pdf.install'))
+    try:
+        while True:
+            name = dict(available_languages())[tr.language]
+            print('\n' + tr('menu.title', language=name))
+            print(tr('menu.search'))
+            print(tr('menu.language'))
+            print(tr('menu.exit'))
+            choice = input(tr('menu.choice')).strip()
+            if choice == '0':
+                break
+            if choice == '2':
+                choose_language(tr)
+            elif choice == '1':
+                phone_number = input(Fore.GREEN + tr('prompt.phone')).strip()
+                region = input(Fore.GREEN + tr('prompt.region')).strip()
+                analyzer = PhoneOSINT(language=tr.language)
+                analyzer.analyze_phone(phone_number, region)
+            else:
+                print(tr('menu.invalid'))
+    except (EOFError, KeyboardInterrupt):
+        print()
+    print(tr('menu.goodbye'))
+
 
 if __name__ == "__main__":
     main()
