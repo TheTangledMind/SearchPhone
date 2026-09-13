@@ -103,7 +103,7 @@ class PhoneOSINT:
                 'number': phone_number,
                 'country_code': region.upper()
             }
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
             if response.status_code == 200:
                 data = response.json()
                 if data.get('valid'):
@@ -131,7 +131,7 @@ class PhoneOSINT:
             url = f"https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-username"
             params = {'username': formatted_number}
             
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -180,7 +180,7 @@ class PhoneOSINT:
                 'num': 20,
                 'hl': 'en'  # Idioma en inglés para resultados internacionales
             }
-            response = requests.get(url, params=params, timeout=15)
+            response = requests.get(url, params=params, timeout=30)
 
             if response.status_code == 200:
                 data = response.json()
@@ -230,7 +230,7 @@ class PhoneOSINT:
         try:
             url = "https://api.duckduckgo.com/"
             params = {'q': f'"{phone_number}"', 'format': 'json', 'no_html': 1}
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -253,7 +253,7 @@ class PhoneOSINT:
             params = {'q': f'"{phone_number}"', 'limit': 20}
             headers = {'User-Agent': 'Mozilla/5.0 (compatible; PhoneOSINT/1.0)'}
             
-            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response = requests.get(url, headers=headers, params=params, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -285,7 +285,7 @@ class PhoneOSINT:
             }
             params = {'q': f'"{phone_number}"'}
             
-            response = requests.get(url, headers=headers, params=params, timeout=10)
+            response = requests.get(url, headers=headers, params=params, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -341,7 +341,7 @@ class PhoneOSINT:
             for future in concurrent.futures.as_completed(futures):
                 source = futures[future]
                 try:
-                    result = future.result(timeout=25)
+                    result = future.result()
                     
                     if source == 'numverify':
                         if result:

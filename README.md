@@ -82,3 +82,7 @@ python -m unittest discover -s tests -v
 
 Tests use temporary preferences, synthetic numbers and blocked API calls. PDF
 label extraction is additionally checked when `fpdf2` and `pdftotext` are present.
+
+### Request timeouts
+
+Each provider HTTP request uses a 30-second connection and read-inactivity timeout. This is not a 30-second deadline for the whole search and does not guarantee that a provider returns matches.
