@@ -86,3 +86,7 @@ label extraction is additionally checked when `fpdf2` and `pdftotext` are presen
 ### Request timeouts
 
 Each provider HTTP request uses a 30-second connection and read-inactivity timeout. This is not a 30-second deadline for the whole search and does not guarantee that a provider returns matches.
+
+### GitHub result reporting
+
+The console and PDF list every collected GitHub result, matching the GitHub count and JSON export. This covers collected results, not every match available from GitHub.

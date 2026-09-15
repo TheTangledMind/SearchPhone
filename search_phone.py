@@ -434,7 +434,7 @@ class PhoneOSINT:
         # GitHub
         if self.results.get('github') and len(self.results['github']) > 0:
             print(self.tr('console.github', v0=Fore.YELLOW))
-            for i, item in enumerate(self.results['github'][:3], 1):
+            for i, item in enumerate(self.results['github'], 1):
                 repo = item.get('repository', self.tr('unknown'))
                 path = item.get('path', '')
                 url = item.get('url', '')
@@ -653,7 +653,7 @@ class PhoneOSINT:
                 pdf.set_font("Helvetica", "B", 12)
                 pdf.cell(190, 8, self.tr('report.github'), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
-                for i, item in enumerate(self.results['github'][:3], 1):
+                for i, item in enumerate(self.results['github'], 1):
                     repo = self.clean_text(item.get('repository', self.tr('unknown')))
                     path = self.clean_text(item.get('path', ''))
                     url = self.clean_text(item.get('url', ''))

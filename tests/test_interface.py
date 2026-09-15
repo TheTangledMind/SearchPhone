@@ -74,3 +74,29 @@ class InterfaceTests(unittest.TestCase):
                     text = subprocess.check_output(['pdftotext', str(pdf), '-']).decode()
                     self.assertIn(pdf_title, text)
                     self.assertIn('Teléfono:' if code == 'es' else 'Phone:', text)
+
+    def test_all_github_results_appear_in_console_and_exports(self):
+        for code in ('en', 'es'):
+            with self.subTest(language=code), contextlib.chdir(self.temp.name):
+                app = search_phone.PhoneOSINT(language=code)
+                app.phone_number, app.region, app.timestamp = '+61491570156', 'au', code
+                app.results['github'] = [
+                    {'repository': f'fixture/contact-{i}', 'path': 'contact.md',
+                     'url': f'https://example.invalid/contact-{i}'}
+                    for i in range(1, 5)
+                ]
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    app.display_results()
+                    app.export_results()
+                    app.export_pdf()
+                for item in app.results['github']:
+                    self.assertIn(item['url'], output.getvalue())
+                self.assertIn(app.tr('console.results', v0='', v1='GitHub', v2=4), output.getvalue())
+                data = json.loads((Path(app.report_dir) / app.get_filename('json')).read_text())
+                self.assertEqual(data['results']['github'], app.results['github'])
+                if search_phone.PDF_AVAILABLE and shutil.which('pdftotext'):
+                    pdf = Path(app.report_dir) / app.get_filename('pdf')
+                    text = subprocess.check_output(['pdftotext', str(pdf), '-']).decode()
+                    for item in app.results['github']:
+                        self.assertIn(item['url'], text)
