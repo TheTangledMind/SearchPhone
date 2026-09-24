@@ -36,6 +36,9 @@ Thumbs.db
 .env
 .env.local
 
+#AI agent.md
+AGENT.md
+
 # Local credentials and environment
 .env.*
 !.env.example
